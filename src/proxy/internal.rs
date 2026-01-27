@@ -357,19 +357,21 @@ where
         I: hyper::rt::Read + hyper::rt::Write + Unpin + Send + 'static,
     {
         let service = service_fn(|mut req| {
-            if req.version() == hyper::Version::HTTP_10 || req.version() == hyper::Version::HTTP_11
-            {
-                let (mut parts, body) = req.into_parts();
+            // Reconstruct URI with scheme and authority for all HTTP versions
+            // HTTP/2 requests may have :authority pseudo-header but need full URI for proxying
+            let (mut parts, body) = req.into_parts();
 
-                parts.uri = {
-                    let mut parts = parts.uri.into_parts();
-                    parts.scheme = Some(scheme.clone());
-                    parts.authority = Some(authority.clone());
-                    Uri::from_parts(parts).expect("Failed to build URI")
-                };
+            // Only set scheme/authority if not already present
+            let mut uri_parts = parts.uri.into_parts();
+            if uri_parts.scheme.is_none() {
+                uri_parts.scheme = Some(scheme.clone());
+            }
+            if uri_parts.authority.is_none() {
+                uri_parts.authority = Some(authority.clone());
+            }
+            parts.uri = Uri::from_parts(uri_parts).expect("Failed to build URI");
 
-                req = Request::from_parts(parts, body);
-            };
+            req = Request::from_parts(parts, body);
 
             self.clone().proxy(req)
         });

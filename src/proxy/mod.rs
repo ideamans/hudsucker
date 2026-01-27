@@ -116,10 +116,14 @@ where
 
         let server = self.server.unwrap_or_else(|| {
             let mut builder = ServerBuilder::new(TokioExecutor::new());
+            // Configure HTTP/1 settings
             builder
                 .http1()
                 .title_case_headers(true)
                 .preserve_header_case(true);
+            // Enable HTTP/2 support when feature is enabled
+            #[cfg(feature = "http2")]
+            builder.http2();
             builder
         });
 
